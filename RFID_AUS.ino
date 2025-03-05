@@ -7,8 +7,6 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <ESP_Mail_Client.h>
-#include <WebServer.h>
-#include <Preferences.h>
 
 
 
@@ -29,16 +27,12 @@
 #define EMAIL_SENDER "fichadorelite17@gmail.com"
 #define EMAIL_PASSWORD "xrmjhvekjssbkxoa"
 #define EMAIL_RECIPIENT_1 "rdinis@elitesports17.com"
+//#define EMAIL_RECIPIENT_2 "mmeissner@elitesports17.com"
+//#define EMAIL_RECIPIENT_3 "adrimvalia@hotmail.com"
 
 
-Preferences preferences;
-WebServer server(80);
-
-const char *apSSID = "Fichador_Config";  // Nome da rede AP
-const char *apPassword = "12345678";     // Senha do AP
-
-String storedSSID;
-String storedPassword;
+const char* ssid = "MOVISTAR-WIFI6-C118"; 
+const char* wifiPassword = "eTXi9WN9ViYUP4HY4gbi"; 
 
 
 const char* username = "rdinis@elitesports17.com";
@@ -80,7 +74,8 @@ bool tokenRenewedToday = false;  // Para verificar se o token já foi renovado h
 
 
 
-const char* signModeNames[] = {"", "Entrada", "Salida", "Iniciar Pausa", "Finalizar Pausa"};
+const char* signModeNames[] = {"", "Entry", "Exit", "Start Break", "End Break"};
+
 
 
 
@@ -88,35 +83,6 @@ const char* signModeNames[] = {"", "Entrada", "Salida", "Iniciar Pausa", "Finali
 SMTPSession smtp;
 ESP_Mail_Session session;
 SMTP_Message message;
-
-
-void handleRoot() {
-    String html = "<html><body>";
-    html += "<h2>Configurar Wi-Fi</h2>";
-    html += "<form action='/save' method='POST'>";
-    html += "SSID: <input type='text' name='ssid'><br>";
-    html += "Senha: <input type='password' name='password'><br>";
-    html += "<input type='submit' value='Salvar'>";
-    html += "</form></body></html>";
-    server.send(200, "text/html", html);
-}
-
-void handleSave() {
-    if (server.hasArg("ssid") && server.hasArg("password")) {
-        storedSSID = server.arg("ssid");
-        storedPassword = server.arg("password");
-
-        preferences.putString("ssid", storedSSID);
-        preferences.putString("password", storedPassword);
-
-        server.send(200, "text/html", "<h2>Wi-Fi salvo! Reiniciando...</h2>");
-        delay(2000);
-        ESP.restart();
-    } else {
-        server.send(400, "text/html", "<h2>Erro: Preencha todos os campos!</h2>");
-    }
-}
-
 
 // **Função para exibir logs do envio de e-mail**
 void smtpCallback(SMTP_Status status) {
@@ -199,46 +165,33 @@ void detectCard(String fullname, String cardUID, int currentHour, int currentMin
 
 // **Função para Conectar ao WiFi**
 void setup_wifi() {
-    preferences.begin("wifi", false);
-    storedSSID = preferences.getString("ssid", "");
-    storedPassword = preferences.getString("password", "");
-
-    if (storedSSID != "" && storedPassword != "") {
-        Serial.print("Tentando conectar a: ");
-        Serial.println(storedSSID);
-        WiFi.begin(storedSSID.c_str(), storedPassword.c_str());
-
-        unsigned long startAttemptTime = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
-            Serial.print(".");
-            delay(500);
-        }
-
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.println("\n✅ Conectado ao Wi-Fi com sucesso!");
-            Serial.print("IP: ");
-            Serial.println(WiFi.localIP());
-            return;
+    delay(50);
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+    WiFi.begin(ssid, wifiPassword);
+    int retryCount = 0;
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.print(".");
+        retryCount++;
+        if (retryCount > 10) { // Tempo máximo de espera: 10 segundos
+            Serial.println("\nFailed to connect to WiFi. Restarting...");
+            ESP.restart(); // Reinicia o ESP32 caso não consiga conectar
         }
     }
-
-    Serial.println("\n⚠️ Falha na conexão. Criando AP...");
-    WiFi.softAP(apSSID, apPassword);
-    Serial.println("AP Criado: " + String(apSSID));
-    Serial.println("Acesse 192.168.4.1 no navegador para configurar o Wi-Fi.");
-
-    server.on("/", handleRoot);
-    server.on("/save", HTTP_POST, handleSave);
-    server.begin();
+    Serial.println("");
+    Serial.print("Connected to WiFi. IP Address: ");
+    Serial.println(WiFi.localIP());
 }
 
 // **Função para Exibir Mensagem de Boas-Vindas**
 void displayWelcomeMessage() {
     lcd.clear();
     lcd.setCursor(3, 1);
-    lcd.print("EliteSports17");
+    lcd.print("McNaughtans");
     lcd.setCursor(3, 2);
-    lcd.print("Bienvenido");
+    lcd.print("Welcome");
 
 }
 
@@ -610,9 +563,6 @@ void setup() {
 // **Função Principal de Loop**
 // **Função Principal de Loop**
 void loop() {
-
-    server.handleClient();
-
     int buttonState = digitalRead(BUTTON_PIN);
     if (buttonState == LOW && lastButtonState == HIGH) {
         signMode = (signMode % 4) + 1;
